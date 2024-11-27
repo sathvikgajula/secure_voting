@@ -107,11 +107,6 @@ Contributions are welcome! Feel free to fork the repository, make improvements, 
 
 ---
 
-## **License**
-This project is licensed under the [MIT License](LICENSE).
-
----
-
 ## **Contact**
 For questions or suggestions, feel free to contact **[Sathvik Gajula](mailto:sgajula2023@fau.edu)**.
 
