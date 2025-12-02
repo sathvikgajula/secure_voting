@@ -171,4 +171,108 @@ describe('secure_voting', () => {
       console.log("Upgrade not approved. No changes made to the file.");
     }
   });
+
+  // --- CHAOS FUZZING TEST BLOCK START ---
+  it('SURVIVES CHAOS: 50 Random Voters with Fuzzed Inputs', async () => {
+    console.log("\n💥 STARTING CHAOS FUZZ TESTING 💥");
+    
+    // 1. Setup a new chaotic election
+    const fuzzVoteState = anchor.web3.Keypair.generate();
+    const fuzzDealer = anchor.web3.Keypair.generate();
+    // Since we reuse the upgradeFile struct in the program, we need a new account for it too
+    const fuzzUpgradeFile = anchor.web3.Keypair.generate();
+
+    // Airdrop to dealer
+    await airdrop(fuzzDealer.publicKey);
+
+    await program.methods.initialize().accounts({
+      voteState: fuzzVoteState.publicKey,
+      upgradeFile: fuzzUpgradeFile.publicKey,
+      dealer: fuzzDealer.publicKey,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    }).signers([fuzzVoteState, fuzzUpgradeFile, fuzzDealer]).rpc();
+
+    // 2. Generate Polynomial
+    // Random coefficients for checking different math scenarios
+    const fuzzCoefficients = [BigInt(11)]; 
+    for (let i = 1; i < THRESHOLD; i++) {
+      // Random coefficient between 0 and PRIME
+      const randomCoeff = Math.floor(Math.random() * 2089);
+      fuzzCoefficients.push(BigInt(randomCoeff));
+    }
+
+    await program.methods.createPolynomialAndDistributeShares(
+      fuzzCoefficients.map(c => new anchor.BN(c.toString()))
+    ).accounts({
+      voteState: fuzzVoteState.publicKey,
+      dealerAuthority: fuzzDealer.publicKey,
+    }).signers([fuzzDealer]).rpc();
+
+    // 3. Run the Chaos Loop
+    let yesVotesCount = 0;
+    const NUM_FUZZ_VOTERS = 50;
+    
+    for (let i = 0; i < NUM_FUZZ_VOTERS; i++) {
+      // A. Create a random voter
+      const randomVoter = anchor.web3.Keypair.generate();
+      await airdrop(randomVoter.publicKey, 0.1 * anchor.web3.LAMPORTS_PER_SOL); // Minimal SOL needed
+
+      // B. Math: Generate valid shares for this specific voter index (i+1)
+      const x = BigInt(i + 1);
+      let y = BigInt(0);
+      for (let j = 0; j < fuzzCoefficients.length; j++) {
+        y = (y + fuzzCoefficients[j] * (x ** BigInt(j))) % PRIME;
+      }
+
+      // C. Initialize Voter On-Chain
+      await program.methods.initializeVoter(
+        new anchor.BN(x.toString()),
+        new anchor.BN(y.toString())
+      ).accounts({
+        voter: randomVoter.publicKey,
+        payer: provider.wallet.publicKey,
+        authority: randomVoter.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      }).signers([randomVoter]).rpc();
+
+      // D. Randomly Decide Vote
+      const voteDecision = Math.random() < 0.6; // 60% chance of YES
+      if (voteDecision) yesVotesCount++;
+
+      // E. Cast Vote
+      try {
+        await program.methods.submitVote(voteDecision).accounts({
+          voter: randomVoter.publicKey,
+          voteState: fuzzVoteState.publicKey,
+          authority: randomVoter.publicKey,
+        }).signers([randomVoter]).rpc();
+        // console.log(`   Generate Voter ${i+1}: Voted ${voteDecision ? "YES" : "NO"}`);
+      } catch (err) {
+        console.error(`   ❌ Chaos Error at voter ${i}:`, err);
+        throw err; // Fail the test if the program crashes unexpectedly
+      }
+    }
+
+    // 4. Verification
+    await program.methods.computeResult().accounts({
+      voteState: fuzzVoteState.publicKey,
+    }).rpc();
+
+    const state = await program.account.voteState.fetch(fuzzVoteState.publicKey);
+    console.log(`   📊 Chaos Result: ${state.yesVotes} YES votes recorded.`);
+    console.log(`   📊 Real Count:   ${yesVotesCount} YES votes expected.`);
+
+    // Assertion: Did the blockchain count correctly matches our local count?
+    if (state.yesVotes.toNumber() !== yesVotesCount) {
+        throw new Error("❌ CRITICAL: Blockchain vote count mismatch!");
+    }
+
+    // Assertion: Did the secret reconstruction work if threshold met?
+    if (yesVotesCount >= THRESHOLD && !state.upgradeOccurred) {
+        throw new Error("❌ CRITICAL: Threshold met but secret NOT reconstructed!");
+    }
+    
+    console.log("✅ CHAOS TEST PASSED: System handled 50 random interactions perfectly.");
+  });
+  // --- CHAOS FUZZING TEST BLOCK END ---
 });
