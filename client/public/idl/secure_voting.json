@@ -1,0 +1,284 @@
+{
+  "version": "0.1.0",
+  "name": "secure_voting",
+  "instructions": [
+    {
+      "name": "initialize",
+      "accounts": [
+        {
+          "name": "voteState",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "upgradeFile",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "dealer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "createPolynomialAndDistributeShares",
+      "accounts": [
+        {
+          "name": "voteState",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "dealerAuthority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "coefficients",
+          "type": {
+            "vec": "u64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "initializeVoter",
+      "accounts": [
+        {
+          "name": "voter",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "shareX",
+          "type": "u64"
+        },
+        {
+          "name": "shareY",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "submitVote",
+      "accounts": [
+        {
+          "name": "voter",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "voteState",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": [
+        {
+          "name": "vote",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "computeResult",
+      "accounts": [
+        {
+          "name": "voteState",
+          "isMut": true,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "applyUpgrade",
+      "accounts": [
+        {
+          "name": "voteState",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "upgradeFile",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "authority",
+          "isMut": false,
+          "isSigner": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "VoteState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "threshold",
+            "type": "u64"
+          },
+          {
+            "name": "totalVoters",
+            "type": "u64"
+          },
+          {
+            "name": "sharesCollected",
+            "type": "u64"
+          },
+          {
+            "name": "xValues",
+            "type": {
+              "vec": "u64"
+            }
+          },
+          {
+            "name": "yValues",
+            "type": {
+              "vec": "u64"
+            }
+          },
+          {
+            "name": "upgradeOccurred",
+            "type": "bool"
+          },
+          {
+            "name": "coefficients",
+            "type": {
+              "vec": "u64"
+            }
+          },
+          {
+            "name": "dealerAuthority",
+            "type": "publicKey"
+          },
+          {
+            "name": "yesVotes",
+            "type": "u64"
+          },
+          {
+            "name": "noVotes",
+            "type": "u64"
+          },
+          {
+            "name": "totalVotes",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpgradeFile",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "content",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Voter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hasVoted",
+            "type": "bool"
+          },
+          {
+            "name": "shareX",
+            "type": "u64"
+          },
+          {
+            "name": "shareY",
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "type": "publicKey"
+          }
+        ]
+      }
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AlreadyVoted",
+      "msg": "Voter has already voted"
+    },
+    {
+      "code": 6001,
+      "name": "InsufficientShares",
+      "msg": "Insufficient shares to compute the result"
+    },
+    {
+      "code": 6002,
+      "name": "NonInvertible",
+      "msg": "Non-invertible element encountered"
+    },
+    {
+      "code": 6003,
+      "name": "UpgradeNotApproved",
+      "msg": "Upgrade has not been approved"
+    },
+    {
+      "code": 6004,
+      "name": "ContentTooLarge",
+      "msg": "Content is too large for the UpgradeFile account"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidPolynomialDegree",
+      "msg": "Invalid polynomial degree"
+    }
+  ],
+  "metadata": {
+    "address": "4FWXDxhLGqGvdG3gbeS7PqXBoQFqsDBcWa1Bp578PamE"
+  }
+}

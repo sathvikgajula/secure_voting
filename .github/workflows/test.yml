@@ -1,0 +1,47 @@
+name: Secure Voting CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  audit-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Install Rust
+      - name: Install Rust Toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      # Install Solana Tool Suite (Release 1.17.0 is stable)
+      - name: Install Solana
+        run: |
+          sh -c "$(curl -sSfL https://release.solana.com/v1.17.0/install)"
+          echo "/home/runner/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
+      # Install Anchor CLI
+      - name: Install Anchor
+        run: |
+          cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+          avm install latest
+          avm use latest
+
+      # Check formatting (Standard requirement for big teams)
+      - name: Run Cargo Format Check
+        run: cargo fmt -- --check
+
+      # Check for Rust errors and warnings
+      - name: Run Clippy (Linting)
+        run: cargo clippy -- -D warnings
+
+      # Run the Property Tests we just added
+      - name: Run Invariant Tests
+        run: cargo test
